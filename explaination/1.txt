@@ -1,0 +1,153 @@
+这是一个业务组件库，因为h5端跟web端都要用到 LText LImage等组件，
+所以将他们单独抽离出来，做成一个npm package
+
+
+1,创建项目 vue3 加 typeScript
+  imooc-cli init
+  选择项目 ，选择慕课乐高标准项目模板
+
+
+2,从lego_local 项目里将 
+
+ components/LText/LText.vue 
+
+ components/LImage/LImage.vue 
+
+ components/LShape/LShape.vue 
+
+ hooks/componentCommonFunc.ts
+
+ defaultProps.ts  (数据文件)
+
+ 文件移动到当前项目
+
+
+
+ 3,Vue3 的插件系统
+
+ ---单个组件导入并且作为插件使用
+
+    代码块
+    import { LText } from 'lego-components'
+    app.use(LText)
+    // 或者
+    app.component(LText.name, LText)
+
+・每个组件新建一个文件夹，并且创建一个单独的 index.ts 文件 (查看components/LText/index.ts 文件components/LImage/index.ts)
+・每个组件设计成一个插件（一个object 拥有 install 方法）
+・在全局入口文件 src/index.ts 中导出 
+
+
+
+---所有组件一次性全部导入并且作为插件使用
+    代码块
+    import LegoComponents from 'lego-components'
+    app.use(LegoComponents)
+
+・建立一个入口文件 src/index.ts
+・将所有组件导入，作为一个数组，创建一个 install 函数，循环调用 app.component
+・默认导出一个插件（这个 install 函数） 在全局入口文件 src/index.ts 中导出
+
+
+
+4,开始打包，roll up用来打包npm库，wabpack用来打包各种app
+  打包要打成ES modules (也就是npm包),跟UMD类型（也就是cdn）两种,其中首选npm包
+  
+  vue3里面帮助打包的一些库
+
+  npm i rollup --save-dev
+
+  // 针对vue文件
+  npm i rollup-plugin-vue --save-dev
+
+  // 针对css文件
+  npm install rollup-plugin-css-only --save-dev
+
+  // 针对ts文件
+  npm install rollup-plugin-typescript2 typescript tslib --save-dev
+
+  // 针对文件里导入的node_modules里面的库内容
+  // (比如 import { defineComponent } from 'vue'   import {without,pick} from "lodash-es" ) 
+  npm install @rollup/plugin-node-resolve --save-dev
+
+
+  打包ts的时候注意tsconfig.json里的一些配置
+
+    "target": "esnext",
+    "module": "esnext",
+    "jsx": "preserve",
+
+    "include": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "src/**/*.vue",
+        "tests/**/*.ts",
+        "tests/**/*.tsx"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
+
+    
+5，建立 build/rollup.config.js 文件
+   rollup.esm.config.js
+   rollup.umd.config.js   ->有两个地方还需要调查一下
+
+6, 用来删除dist文件夹
+  npm i rimraf --save-dev
+
+7, package.json 里面添加四条命令
+    "build": "npm run clean && npm run build:esm && npm run build:umd",
+    "build:esm": "rollup --config build/rollup.esm.config.js",
+    "build:umd": "rollup --config build/rollup.umd.config.js",
+    "clean": "rimraf ./dist"
+
+
+8，运行 npm run build
+
+9,package.json里面写上,创建项目的入口文件
+
+  "main": "dist/zhang-lego-components.umd.js",
+  "module": "dist/zhang-lego-components.esm.js",
+  "types": "dist/index.d.ts",
+
+8, 这个是专门为vue写的插件，所以将 "vue": "^3.0.0" 从dependencies里面取出来放到
+    peerDependencies里面去
+    与devDependencies里面去
+    peerDependencies的vue的作用是告诉用户在install zhang-lego-components  之前
+    必须先install vue
+    devDependencies的vue的作用是表示,测试开发的时候可能需要用到vue
+
+
+    项目A如果需要使用到 zhang-lego-components 这个业务组件库，
+    就会使用如下命令
+    npm install zhang-lego-components 
+    这时zhang-lego-components 会出现在项目A的 package.json 的"dependencies"里面
+    而 zhang-lego-components 和 zhang-lego-components的dependencies
+    core-js, lodash-es 这三个文件夹会出现在项目A的 node_modules 里面，
+    如果A项目的node_modules里面如果没有vue这个包，那么会发出警告
+
+
+9,在本地测试一下打包出来的文件是否好用，(zhang_lego_components业务组件库不上传到npm的情况下测试)
+  在zhang_lego_components 这个业务组件库的文件夹下 npm link 创建一个软连接
+  然后cd到另一个要使用zhang_lego_components业务组件库的测试项目里，(假设测试项目为B)
+  cd B
+  然后 npm link zhang-lego-components (package.json中的name)
+  然后再为了引用正确， 项目B的dependencies里面写上 "zhang-lego-components":"1.0.0"
+  项目B的main.ts里面写上
+
+    import zhangLegoComponents from 'zhang-lego-components'
+    import 'zhang-lego-components/dist/bundle.css'
+    app.use(zhangLegoComponents)
+
+ 项目B就可以使用本地的zhang-lego-components 库了
+ 
+
+ 9,发布到npm
+  npm whoami 检查是否登录
+  npm login (id:zhanghaifeng1123 )
+  npm config ls 检查是否使用淘宝代理，使用了taobao代理，发布到npm的时候会一直报错
+
+  修改package.json 文件为发布做准备
+  
+  "private": false
